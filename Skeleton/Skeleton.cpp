@@ -88,6 +88,67 @@ struct Sphere : public Intersectable {
 	}
 };
 
+struct Plane : public Intersectable {
+	vec3 normal, point;
+	Plane(const vec3& n, const vec3& p, Material* _material) {
+		normal = n;
+		point = p;
+		material = _material;
+	}
+
+	Hit intersect(const Ray& ray) {
+		Hit hit;
+		float t = -(dot(normal, ray.start) - dot(normal, point)) / (dot(normal, ray.dir));
+		hit.t = t;
+		hit.position = ray.start + (ray.dir * hit.t);
+		hit.normal = normal;
+		hit.material = material;
+		return hit;
+	}
+};
+
+struct Cylinder : public Intersectable {
+	vec3 bottom, top;
+	float radius, heigth;
+
+	Cylinder(const vec3& _bottom, const vec3& _top, const float _radius, Material* _material) {
+		bottom = _bottom;
+		top = _top;
+		radius = _radius;
+		heigth = length(top-bottom);
+	}
+
+	Hit intersect(const Ray& ray) {
+		Hit hit;
+		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
+		float b = 2*(ray.dir.x + ray.dir.z);
+		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius);
+		float discr = b * b - 4.0f * a * c;
+		if (discr < 0) return hit;
+		float sqrt_discr = sqrtf(discr);
+		float t1 = (-b + sqrt_discr) / 2.0f / a;
+		float t2 = (-b - sqrt_discr) / 2.0f / a;
+		if (t1 <= 0) return hit;
+		bool t1_good = (-ray.start.y / ray.dir.y <= t1 && (heigth - ray.start.y) / ray.dir.y >= t1);
+		bool t2_good = (-ray.start.y / ray.dir.y <= t2 && (heigth - ray.start.y) / ray.dir.y >= t2);
+		float t;
+		if (t1_good && t2_good) {
+			t = (t2 > 0) ? t2 : t1;
+		} else if (t1_good) {
+			t = t1;
+		} else if (t2_good) {
+			t = t2;
+		} else {
+			return hit;
+		}
+		hit.t = t;
+		hit.position = ray.start + ray.dir * hit.t;
+		hit.normal = ((hit.position - bottom) - normalize(top-bottom)*dot(hit.position-bottom, top-bottom)) * (1.0f / radius);
+		hit.material = material;
+		return hit;
+	}
+};
+
 class Camera {
 	vec3 eye, lookat, right, up;
 	float fov;
@@ -143,8 +204,9 @@ public:
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material* material = new Material(kd, ks, 50);
-		for (int i = 0; i < 10; i++)
-			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+		objects.push_back(new Sphere(vec3(0, -0.01, 0), 0.1f, material));
+		objects.push_back(new Plane(vec3(0,1,0), vec3(0, -0.5,0), material));
+		//objects.push_back(new Cylinder(vec3(1,0,0), vec3(0, 1,0), 0.1, material));
 	}
 
 	void render(std::vector<vec4>& image) {
@@ -310,6 +372,6 @@ void onMouseMotion(int pX, int pY) {
 
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
-	scene.Animate(0.1f);
+	scene.Animate(0.05f);
 	glutPostRedisplay();
 }
