@@ -116,12 +116,13 @@ struct Cylinder : public Intersectable {
 		top = _top;
 		radius = _radius;
 		heigth = length(top-bottom);
+		material = _material;
 	}
 
 	Hit intersect(const Ray& ray) {
 		Hit hit;
 		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
-		float b = 2*(ray.dir.x + ray.dir.z);
+		float b = 2*(ray.dir.x*ray.start.x + ray.dir.z*ray.start.z);
 		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius);
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
@@ -129,8 +130,8 @@ struct Cylinder : public Intersectable {
 		float t1 = (-b + sqrt_discr) / 2.0f / a;
 		float t2 = (-b - sqrt_discr) / 2.0f / a;
 		if (t1 <= 0) return hit;
-		bool t1_good = (-ray.start.y / ray.dir.y <= t1 && (heigth - ray.start.y) / ray.dir.y >= t1);
-		bool t2_good = (-ray.start.y / ray.dir.y <= t2 && (heigth - ray.start.y) / ray.dir.y >= t2);
+		bool t1_good = (-ray.start.y / ray.dir.y <= t1 && t1 <= (heigth - ray.start.y) / ray.dir.y);
+		bool t2_good = (-ray.start.y / ray.dir.y <= t2 && t2 <= (heigth - ray.start.y) / ray.dir.y);
 		float t;
 		if (t1_good && t2_good) {
 			t = (t2 > 0) ? t2 : t1;
@@ -143,7 +144,39 @@ struct Cylinder : public Intersectable {
 		}
 		hit.t = t;
 		hit.position = ray.start + ray.dir * hit.t;
-		hit.normal = ((hit.position - bottom) - normalize(top-bottom)*dot(hit.position-bottom, top-bottom)) * (1.0f / radius);
+		vec3 bh = hit.position - bottom;
+		vec3 bt = top - bottom;
+		vec3 M = bottom + normalize(bt) * (dot(bh, bt)/length(bt));
+		hit.normal = normalize(hit.position -M);
+		hit.material = material;
+		return hit;
+	}
+};
+
+struct Paraboloid : public Intersectable {
+	vec3 normal, planePoint, point;
+
+	Paraboloid(const vec3& _normal, const vec3& _planePoint, const vec3& _point, Material* _material) {
+		normal = _normal;
+		planePoint = _planePoint;
+		point = point;
+		material = _material;
+	}
+
+	Hit intersect(const Ray& ray) {
+		Hit hit;
+		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
+		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.z * ray.start.z) - ray.dir.y;
+		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - ray.start.y;
+		float discr = b * b - 4.0f * a * c;
+		if (discr < 0) return hit;
+		float sqrt_discr = sqrtf(discr);
+		float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
+		float t2 = (-b - sqrt_discr) / 2.0f / a;
+		if (t1 <= 0) return hit;
+		hit.t = (t2 > 0) ? t2 : t1;
+		hit.position = ray.start + ray.dir * hit.t;
+		hit.normal = normalize(hit.position);
 		hit.material = material;
 		return hit;
 	}
@@ -204,9 +237,13 @@ public:
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material* material = new Material(kd, ks, 50);
-		objects.push_back(new Sphere(vec3(0, -0.01, 0), 0.1f, material));
-		objects.push_back(new Plane(vec3(0,1,0), vec3(0, -0.5,0), material));
-		//objects.push_back(new Cylinder(vec3(1,0,0), vec3(0, 1,0), 0.1, material));
+		Material* m2 = new Material(vec3(0.1f, 0.2f, 0.3f), vec3(2, 2, 2), 50);
+		objects.push_back(new Sphere(vec3(0.1, -0.2, 0), 0.2f, material));
+		objects.push_back(new Sphere(vec3(-0.1, -0.2, 0), 0.2f, material));
+		objects.push_back(new Sphere(vec3(0, 0.5, 0), 0.15f, material));
+		objects.push_back(new Plane(vec3(0,1,0), vec3(0, -0.5,0), m2));
+		objects.push_back(new Cylinder(vec3(0,0,0), vec3(0, 0.5, 0), 0.1, material));
+		//objects.push_back(new Paraboloid(vec3(0,1,0), vec3(0,0,0), vec3(0,5,0), material));
 	}
 
 	void render(std::vector<vec4>& image) {
@@ -355,6 +392,9 @@ void onDisplay() {
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
+	if (key == 27) {
+		exit(0);
+	}
 }
 
 // Key of ASCII code released
