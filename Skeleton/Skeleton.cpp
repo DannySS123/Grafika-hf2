@@ -56,6 +56,7 @@ protected:
 	Material* material;
 public:
 	virtual Hit intersect(const Ray& ray) = 0;
+	virtual void Animate(float dt) = 0;
 };
 
 struct Sphere : public Intersectable {
@@ -86,6 +87,10 @@ struct Sphere : public Intersectable {
 		hit.material = material;
 		return hit;
 	}
+
+	void Animate(float dt) {
+		center.y += dt/50;
+	}
 };
 
 struct Plane : public Intersectable {
@@ -105,6 +110,39 @@ struct Plane : public Intersectable {
 		hit.material = material;
 		return hit;
 	}
+
+	void Animate(float dt) {
+
+	}
+};
+
+struct Circle : public Intersectable {
+	vec3 normal, point;
+	float radius;
+	Circle(const vec3& n, const vec3& p, const float _radius,  Material* _material) {
+		normal = n;
+		point = p;
+		radius = _radius;
+		material = _material;
+	}
+
+	Hit intersect(const Ray& ray) {
+		Hit hit;
+		float t = -(dot(normal, ray.start) - dot(normal, point)) / (dot(normal, ray.dir));
+		vec3 pos = ray.start + (ray.dir * t);
+		if (length(point - pos) > radius) {
+			return hit;
+		}
+		hit.t = t;
+		hit.position = pos;
+		hit.normal = normal;
+		hit.material = material;
+		return hit;
+	}
+
+	void Animate(float dt) {
+
+	}
 };
 
 struct Cylinder : public Intersectable {
@@ -121,18 +159,23 @@ struct Cylinder : public Intersectable {
 
 	Hit intersect(const Ray& ray) {
 		Hit hit;
-		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
+		/*float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
 		float b = 2*(ray.dir.x*ray.start.x + ray.dir.z*ray.start.z);
-		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius);
+		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius);*/	
+		
+		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
+		float b = 2*(ray.dir.x*ray.start.x + ray.dir.z*ray.start.z - bottom.x * ray.dir.x - bottom.z * ray.dir.z);
+		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius) 
+					+ (bottom.x*bottom.x) + (bottom.z*bottom.z) -2*(ray.start.x*bottom.x) -2*(ray.start.z*bottom.z);
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
 		float sqrt_discr = sqrtf(discr);
 		float t1 = (-b + sqrt_discr) / 2.0f / a;
 		float t2 = (-b - sqrt_discr) / 2.0f / a;
 		if (t1 <= 0) return hit;
-		bool t1_good = (-ray.start.y / ray.dir.y <= t1 && t1 <= (heigth - ray.start.y) / ray.dir.y);
-		bool t2_good = (-ray.start.y / ray.dir.y <= t2 && t2 <= (heigth - ray.start.y) / ray.dir.y);
-		float t;
+		float t = (t2 > 0) ? t2 : t1;
+		/*bool t1_good = ((bottom.y - ray.start.y) / ray.dir.y <= t1 && t1 <= (top.y - ray.start.y) / ray.dir.y);
+		bool t2_good = ((bottom.y - ray.start.y) / ray.dir.y <= t2 && t2 <= (top.y - ray.start.y) / ray.dir.y);
 		if (t1_good && t2_good) {
 			t = (t2 > 0) ? t2 : t1;
 		} else if (t1_good) {
@@ -141,15 +184,35 @@ struct Cylinder : public Intersectable {
 			t = t2;
 		} else {
 			return hit;
+		}*/
+		
+		vec3 pos1 = ray.start + ray.dir * t1;
+		vec3 pos2 = ray.start + ray.dir * t2;
+		if (bottom.y <= pos2.y && pos2.y <= top.y && t2 > 0) {
+			hit.position = pos2;
+			hit.t = t2;
 		}
-		hit.t = t;
-		hit.position = ray.start + ray.dir * hit.t;
+		else if (bottom.y <= pos1.y && pos1.y <= top.y && t1 > 0) {
+			hit.position = pos1;
+			hit.t = t1;
+		}
+		else {
+			return hit;
+		}
+
+		//hit.position = ray.start + ray.dir * hit.t;
 		vec3 bh = hit.position - bottom;
 		vec3 bt = top - bottom;
 		vec3 M = bottom + normalize(bt) * (dot(bh, bt)/length(bt));
-		hit.normal = normalize(hit.position -M);
+		hit.normal = normalize(hit.position - M);
 		hit.material = material;
 		return hit;
+	}
+
+	void Animate(float dt) {
+		bottom.y += dt;
+		top.y += dt;
+		heigth = length(top - bottom);
 	}
 };
 
@@ -165,9 +228,15 @@ struct Paraboloid : public Intersectable {
 
 	Hit intersect(const Ray& ray) {
 		Hit hit;
-		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
+		/*float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
 		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.z * ray.start.z) - ray.dir.y;
-		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - ray.start.y;
+		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - ray.start.y;*/
+		
+		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
+		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.z * ray.start.z - ray.dir.x*point.x - ray.dir.z*point.z) - ray.dir.y;
+		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - ray.start.y
+					+ (point.x * point.x) + (point.z * point.z) + point.y
+					- (2 * ray.start.x * point.x) - (2 * ray.start.z * point.z);
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
 		float sqrt_discr = sqrtf(discr);
@@ -176,9 +245,13 @@ struct Paraboloid : public Intersectable {
 		if (t1 <= 0) return hit;
 		hit.t = (t2 > 0) ? t2 : t1;
 		hit.position = ray.start + ray.dir * hit.t;
-		hit.normal = normalize(hit.position);
+		hit.normal = normalize(vec3(2*hit.position.x, -1, 2*hit.position.z));
 		hit.material = material;
 		return hit;
+	}
+
+	void Animate(float dt) {
+
 	}
 };
 
@@ -238,12 +311,15 @@ public:
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material* material = new Material(kd, ks, 50);
 		Material* m2 = new Material(vec3(0.1f, 0.2f, 0.3f), vec3(2, 2, 2), 50);
-		objects.push_back(new Sphere(vec3(0.1, -0.2, 0), 0.2f, material));
-		objects.push_back(new Sphere(vec3(-0.1, -0.2, 0), 0.2f, material));
-		objects.push_back(new Sphere(vec3(0, 0.5, 0), 0.15f, material));
 		objects.push_back(new Plane(vec3(0,1,0), vec3(0, -0.5,0), m2));
-		objects.push_back(new Cylinder(vec3(0,0,0), vec3(0, 0.5, 0), 0.1, material));
-		//objects.push_back(new Paraboloid(vec3(0,1,0), vec3(0,0,0), vec3(0,5,0), material));
+		objects.push_back(new Cylinder(vec3(0,-0.5,0), vec3(0, -0.45, 0), 0.3, material));
+		objects.push_back(new Circle(vec3(0,1,0), vec3(0, -0.45, 0), 0.3, material));
+		objects.push_back(new Cylinder(vec3(0, -0.45, 0), vec3(0, -0.2, 0), 0.03, material));
+		objects.push_back(new Cylinder(vec3(0, -0.2, 0), vec3(0, 0.2, 0), 0.03, material));
+		objects.push_back(new Sphere(vec3(0, -0.2, 0), 0.05f, material));
+		objects.push_back(new Sphere(vec3(0, 0.2, 0), 0.05f, material));
+
+		objects.push_back(new Paraboloid(vec3(0,0,0), vec3(0.1,-1,0.1), vec3(1,5,1), material));
 	}
 
 	void render(std::vector<vec4>& image) {
@@ -294,6 +370,9 @@ public:
 
 	void Animate(float dt) {
 		camera.Animate(dt);
+		for (Intersectable* object : objects) {
+			//object->Animate(dt);
+		}
 	}
 };
 
