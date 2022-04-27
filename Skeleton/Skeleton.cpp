@@ -159,10 +159,6 @@ struct Cylinder : public Intersectable {
 
 	Hit intersect(const Ray& ray) {
 		Hit hit;
-		/*float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
-		float b = 2*(ray.dir.x*ray.start.x + ray.dir.z*ray.start.z);
-		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius);*/	
-		
 		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
 		float b = 2*(ray.dir.x*ray.start.x + ray.dir.z*ray.start.z - bottom.x * ray.dir.x - bottom.z * ray.dir.z);
 		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius) 
@@ -173,19 +169,6 @@ struct Cylinder : public Intersectable {
 		float t1 = (-b + sqrt_discr) / 2.0f / a;
 		float t2 = (-b - sqrt_discr) / 2.0f / a;
 		if (t1 <= 0) return hit;
-		float t = (t2 > 0) ? t2 : t1;
-		/*bool t1_good = ((bottom.y - ray.start.y) / ray.dir.y <= t1 && t1 <= (top.y - ray.start.y) / ray.dir.y);
-		bool t2_good = ((bottom.y - ray.start.y) / ray.dir.y <= t2 && t2 <= (top.y - ray.start.y) / ray.dir.y);
-		if (t1_good && t2_good) {
-			t = (t2 > 0) ? t2 : t1;
-		} else if (t1_good) {
-			t = t1;
-		} else if (t2_good) {
-			t = t2;
-		} else {
-			return hit;
-		}*/
-		
 		vec3 pos1 = ray.start + ray.dir * t1;
 		vec3 pos2 = ray.start + ray.dir * t2;
 		if (bottom.y <= pos2.y && pos2.y <= top.y && t2 > 0) {
@@ -199,8 +182,6 @@ struct Cylinder : public Intersectable {
 		else {
 			return hit;
 		}
-
-		//hit.position = ray.start + ray.dir * hit.t;
 		vec3 bh = hit.position - bottom;
 		vec3 bt = top - bottom;
 		vec3 M = bottom + normalize(bt) * (dot(bh, bt)/length(bt));
@@ -222,29 +203,58 @@ struct Paraboloid : public Intersectable {
 	Paraboloid(const vec3& _normal, const vec3& _planePoint, const vec3& _point, Material* _material) {
 		normal = _normal;
 		planePoint = _planePoint;
-		point = point;
+		point = _point;
 		material = _material;
 	}
 
 	Hit intersect(const Ray& ray) {
 		Hit hit;
-		/*float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
-		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.z * ray.start.z) - ray.dir.y;
-		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - ray.start.y;*/
+		/*float a = (ray.dir.x * ray.dir.x) + (ray.dir.y * ray.dir.y);
+		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.y * ray.start.y) - ray.dir.z;
+		float c = (ray.start.x * ray.start.x) + (ray.start.y * ray.start.y) - ray.start.z;*/
+
+		/*float px = point.x;
+		float py = point.z;
+		float pz = point.y;
+		float rdz = ray.dir.y;
+		float rdy = ray.dir.z;
+		float rdx = ray.dir.x;	
+		float rsz = ray.start.y;
+		float rsy = ray.start.z;
+		float rsx = ray.start.x;
+
+		float a = (rdx * rdx) + (rdz * rdz);
+		float b = 2 * (rdx * rsx + rdz * rsz - rdx*px - rdz*pz) - rdy;
+		float c = (rsx * rsx) + (rsz * rsz) - rsy
+					+ (px*px) + (pz*pz) + py
+					- (2 * rsx * px) - (2 * rsz * pz);
+	
 		
+		vec3 pos = vec3(rsx, rsy, rsz) + vec3(rdx, rdy, rdz)*t;
+		if (length(pos - vec3(px,py,pz)) > 0.3) {
+			return hit;
+		}*/
+
 		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
 		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.z * ray.start.z - ray.dir.x*point.x - ray.dir.z*point.z) - ray.dir.y;
 		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - ray.start.y
 					+ (point.x * point.x) + (point.z * point.z) + point.y
 					- (2 * ray.start.x * point.x) - (2 * ray.start.z * point.z);
+					
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
 		float sqrt_discr = sqrtf(discr);
 		float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
 		float t2 = (-b - sqrt_discr) / 2.0f / a;
 		if (t1 <= 0) return hit;
-		hit.t = (t2 > 0) ? t2 : t1;
-		hit.position = ray.start + ray.dir * hit.t;
+		float t = (t2 > 0) ? t2 : t1;
+
+		vec3 pos = ray.start + ray.dir * t;
+		if (length(pos - point) > 0.3) {
+			return hit;
+		}
+		hit.t = t;
+		hit.position = pos;
 		hit.normal = normalize(vec3(2*hit.position.x, -1, 2*hit.position.z));
 		hit.material = material;
 		return hit;
@@ -305,8 +315,10 @@ public:
 		camera.set(eye, lookat, vup, fov);
 
 		La = vec3(0.4f, 0.4f, 0.4f);
-		vec3 lightDirection(1, 1, 1), Le(2, 2, 2);
-		lights.push_back(new Light(lightDirection, Le));
+		vec3 lightDirection1(1, 1, 1), Le(2, 2, 2);
+		vec3 lightDirection2(0, 0.2, 0.25);
+		lights.push_back(new Light(lightDirection1, Le));
+		//lights.push_back(new Light(lightDirection2, Le));
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material* material = new Material(kd, ks, 50);
@@ -316,10 +328,11 @@ public:
 		objects.push_back(new Circle(vec3(0,1,0), vec3(0, -0.45, 0), 0.3, material));
 		objects.push_back(new Cylinder(vec3(0, -0.45, 0), vec3(0, -0.2, 0), 0.03, material));
 		objects.push_back(new Cylinder(vec3(0, -0.2, 0), vec3(0, 0.2, 0), 0.03, material));
+		objects.push_back(new Sphere(vec3(0, -0.45, 0), 0.05f, material));
 		objects.push_back(new Sphere(vec3(0, -0.2, 0), 0.05f, material));
 		objects.push_back(new Sphere(vec3(0, 0.2, 0), 0.05f, material));
 
-		objects.push_back(new Paraboloid(vec3(0,0,0), vec3(0.1,-1,0.1), vec3(1,5,1), material));
+		objects.push_back(new Paraboloid(vec3(0,0,0), vec3(0.1,-1,0.1), vec3(0,0.2,0), material));
 	}
 
 	void render(std::vector<vec4>& image) {
