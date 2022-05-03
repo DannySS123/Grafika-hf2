@@ -370,7 +370,7 @@ class Scene {
 	vec3 La;
 public:
 	void build() {
-		vec3 eye = vec3(0, 0, 3), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
+		vec3 eye = vec3(0, 0, 2), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 		float fov = 45 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
@@ -386,10 +386,10 @@ public:
 		objects.push_back(new Cylinder(vec3(0,-0.5,0), vec3(0, -0.45, 0), 0.2, material));
 
 		objects.push_back(new Circle(vec3(0,1,0), vec3(0, -0.45, 0), 0.2, material));
-		objects.push_back(new Cylinder(vec3(0, -0.45, 0), vec3(0, -0.1, 0), 0.02, material));
-		objects.push_back(new Cylinder(vec3(0, -0.1, 0), vec3(0, 0.2, 0), 0.02, material));
 		objects.push_back(new Sphere(vec3(0, -0.45, 0), 0.04f, material));
-		objects.push_back(new Sphere(vec3(0, -0.1, 0), 0.04f, material));
+		objects.push_back(new Cylinder(vec3(0, -0.45, 0), vec3(0, -0.1, -0.1), 0.02, material));
+		objects.push_back(new Sphere(vec3(0, -0.1, -0.1), 0.04f, material));
+		objects.push_back(new Cylinder(vec3(0, -0.1, -0.1), vec3(0, 0.2, 0), 0.02, material));
 		objects.push_back(new Sphere(vec3(0, 0.2, 0), 0.04f, material));
 
 		objects.push_back(new Paraboloid(vec3(0,-0.1,0.3), vec3(0,0.2,0), material));
