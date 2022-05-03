@@ -33,6 +33,9 @@
 //=============================================================================================
 #include "framework.h"
 
+const int maxdepth = 10;
+const float epsilon = 0.0001f;
+
 struct Material {
 	vec3 ka, kd, ks;
 	float  shininess;
@@ -146,7 +149,7 @@ struct Circle : public Intersectable {
 };
 
 struct Cylinder : public Intersectable {
-	vec3 bottom, top;
+	vec3 bottom, middle, top;
 	float radius, heigth;
 
 	Cylinder(const vec3& _bottom, const vec3& _top, const float _radius, Material* _material) {
@@ -154,6 +157,7 @@ struct Cylinder : public Intersectable {
 		top = _top;
 		radius = _radius;
 		heigth = length(top-bottom);
+		middle = bottom + (top - bottom) / 2;
 		material = _material;
 	}
 
@@ -163,6 +167,11 @@ struct Cylinder : public Intersectable {
 		float b = 2*(ray.dir.x*ray.start.x + ray.dir.z*ray.start.z - bottom.x * ray.dir.x - bottom.z * ray.dir.z);
 		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius) 
 					+ (bottom.x*bottom.x) + (bottom.z*bottom.z) -2*(ray.start.x*bottom.x) -2*(ray.start.z*bottom.z);
+
+		/*float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
+		float b = 2*(ray.dir.x*ray.start.x + ray.dir.z*ray.start.z - middle.x * ray.dir.x - middle.z * ray.dir.z);
+		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - (radius * radius) 
+					+ (middle.x* middle.x) + (middle.z* middle.z) -2*(ray.start.x* middle.x) -2*(ray.start.z* middle.z);*/
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
 		float sqrt_discr = sqrtf(discr);
@@ -198,12 +207,12 @@ struct Cylinder : public Intersectable {
 };
 
 struct Paraboloid : public Intersectable {
-	vec3 normal, planePoint, point;
+	vec3 normal, planePoint, focusPoint;
 
-	Paraboloid(const vec3& _normal, const vec3& _planePoint, const vec3& _point, Material* _material) {
+	Paraboloid(const vec3& _normal, const vec3& _planePoint, const vec3& _focusPoint, Material* _material) {
 		normal = _normal;
 		planePoint = _planePoint;
-		point = _point;
+		focusPoint = _focusPoint;
 		material = _material;
 	}
 
@@ -236,26 +245,67 @@ struct Paraboloid : public Intersectable {
 		}*/
 
 		float a = (ray.dir.x * ray.dir.x) + (ray.dir.z * ray.dir.z);
-		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.z * ray.start.z - ray.dir.x*point.x - ray.dir.z*point.z) - ray.dir.y;
+		float b = 2 * (ray.dir.x * ray.start.x + ray.dir.z * ray.start.z - ray.dir.x* focusPoint.x - ray.dir.z* focusPoint.z) - ray.dir.y;
 		float c = (ray.start.x * ray.start.x) + (ray.start.z * ray.start.z) - ray.start.y
-					+ (point.x * point.x) + (point.z * point.z) + point.y
-					- (2 * ray.start.x * point.x) - (2 * ray.start.z * point.z);
+					+ (focusPoint.x * focusPoint.x) + (focusPoint.z * focusPoint.z) + focusPoint.y
+					- (2 * ray.start.x * focusPoint.x) - (2 * ray.start.z * focusPoint.z);
 					
+
+		/*float a = dot(ray.dir, ray.dir) * (dot(normal, normal));
+		float b = 2 * (dot(ray.start, ray.dir) - dot(ray.dir, focusPoint)) + 2 * dot(normal, normal) * (-dot(ray.start, ray.dir) + dot(ray.dir, planePoint));
+		float c = dot(ray.start, ray.start) + dot(focusPoint, focusPoint) - 2 * dot(ray.start, focusPoint)
+			+ dot(normal, normal) * (-dot(ray.start, ray.start)-dot(focusPoint, focusPoint)+2*dot(ray.start, planePoint));*/
+
+		//printf("a: %f,  b: %f,  c: %f\n", a,b,c);
+
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
 		float sqrt_discr = sqrtf(discr);
 		float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
 		float t2 = (-b - sqrt_discr) / 2.0f / a;
 		if (t1 <= 0) return hit;
-		float t = (t2 > 0) ? t2 : t1;
 
-		vec3 pos = ray.start + ray.dir * t;
-		if (length(pos - point) > 0.3) {
-			return hit;
+		vec3 pos1 = ray.start + ray.dir * t1;
+		vec3 pos2 = ray.start + ray.dir * t2;
+
+		//t = length(focusPoint - ray.start + dot(normal,ray.start) - dot(normal,planePoint)) / length(ray.dir-dot(normal,ray.dir));
+		float l = 0.3;
+
+		if (t2 <= 0) {
+			if (length(pos1 - focusPoint) <= l) {
+				hit.t = t1;
+				hit.position = pos1;
+			}
+			else {
+				return hit;
+			}
 		}
-		hit.t = t;
-		hit.position = pos;
-		hit.normal = normalize(vec3(2*hit.position.x, -1, 2*hit.position.z));
+		else {
+			if (length(pos2 - focusPoint) <= l) {
+				hit.t = t2;
+				hit.position = pos2;
+			}
+			else if (length(pos1 - focusPoint) <= l) {
+				hit.t = t1;
+				hit.position = pos1;
+			}
+			else {
+				return hit;
+			}
+		}
+
+		/*if (length(pos2 - focusPoint) <= l && t2 > 0) {
+			hit.t = t2;
+			hit.position = pos2;
+		}
+		else if (length(pos1 - focusPoint) <= l) {
+			hit.t = t1;
+			hit.position = pos1;
+		}
+		else {
+			return hit;
+		}*/
+		hit.normal = normalize(vec3(2*(hit.position.x-focusPoint.x), -1, 2*(hit.position.z-focusPoint.z)));
 		hit.material = material;
 		return hit;
 	}
@@ -291,17 +341,27 @@ public:
 };
 
 struct Light {
-	vec3 direction;
-	vec3 Le;
-	Light(vec3 _direction, vec3 _Le) {
-		direction = normalize(_direction);
-		Le = _Le;
+	vec3 location;
+	vec3 power;
+
+	Light(vec3 _location, vec3 _power) {
+		location = _location;
+		power = _power;
+	}
+	double distanceOf(vec3 point) {
+		return length(location - point);
+	}
+	vec3 directionOf(vec3 point) {
+		return normalize(location - point);
+	}
+	vec3 radianceAt(vec3 point) {
+		double distance2 = dot(location - point, location - point);
+		if (distance2 < epsilon) distance2 = epsilon;
+		return power / distance2;
 	}
 };
 
 float rnd() { return (float)rand() / RAND_MAX; }
-
-const float epsilon = 0.0001f;
 
 class Scene {
 	std::vector<Intersectable*> objects;
@@ -314,11 +374,9 @@ public:
 		float fov = 45 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
-		La = vec3(0.4f, 0.4f, 0.4f);
-		vec3 lightDirection1(1, 1, 1), Le(2, 2, 2);
-		vec3 lightDirection2(0, 0.2, 0.25);
-		lights.push_back(new Light(lightDirection1, Le));
-		//lights.push_back(new Light(lightDirection2, Le));
+		La = vec3(0.1f, 0.1f, 0.1f);
+		vec3 lightPos(0, 0.35, 0.35), Le(2, 2, 2);
+		lights.push_back(new Light(lightPos, Le));
 
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material* material = new Material(kd, ks, 50);
@@ -332,7 +390,7 @@ public:
 		objects.push_back(new Sphere(vec3(0, -0.2, 0), 0.05f, material));
 		objects.push_back(new Sphere(vec3(0, 0.2, 0), 0.05f, material));
 
-		objects.push_back(new Paraboloid(vec3(0,0,0), vec3(0.1,-1,0.1), vec3(0,0.2,0), material));
+		objects.push_back(new Paraboloid(vec3(0,1,0), vec3(0,0,0), vec3(0,0.25,0), material));
 	}
 
 	void render(std::vector<vec4>& image) {
@@ -345,8 +403,8 @@ public:
 				image[Y * windowWidth + X] = vec4(color.x, color.y, color.z, 1);
 			}
 		}
-
-		printf("Rendering time: %d ms\n", glutGet(GLUT_ELAPSED_TIME) - timeStart);
+		int rt = glutGet(GLUT_ELAPSED_TIME) - timeStart;
+		printf("Rendering time: %d ms\t FPS: %f\n", rt, 1000.0/rt);
 	}
 
 	Hit firstIntersect(Ray ray) {
@@ -359,8 +417,13 @@ public:
 		return bestHit;
 	}
 
-	bool shadowIntersect(Ray ray) {	// for directional lights
-		for (Intersectable* object : objects) if (object->intersect(ray).t > 0) return true;
+	bool shadowIntersect(Ray ray, vec3 lightPos) {	// for directional lights
+		for (Intersectable* object : objects) {
+			Hit hit = object->intersect(ray);
+			if (hit.t > 0 && length(hit.position-ray.start) < length(hit.position-lightPos)) {
+				return true;
+			}
+		}
 		return false;
 	}
 
@@ -369,17 +432,65 @@ public:
 		if (hit.t < 0) return La;
 		vec3 outRadiance = hit.material->ka * La;
 		for (Light* light : lights) {
-			Ray shadowRay(hit.position + hit.normal * epsilon, light->direction);
-			float cosTheta = dot(hit.normal, light->direction);
-			if (cosTheta > 0 && !shadowIntersect(shadowRay)) {	// shadow computation
-				outRadiance = outRadiance + light->Le * hit.material->kd * cosTheta;
-				vec3 halfway = normalize(-ray.dir + light->direction);
+			vec3 lhdir = normalize(light->location - hit.position);
+			Ray shadowRay(hit.position + hit.normal * epsilon, lhdir);
+			float cosTheta = dot(hit.normal, lhdir);
+			if (cosTheta > 0 && !shadowIntersect(shadowRay, light->location)) {	// shadow computation
+				outRadiance = outRadiance + light->radianceAt(hit.position) * hit.material->kd * cosTheta;
+				vec3 halfway = normalize(-ray.dir + lhdir);
 				float cosDelta = dot(hit.normal, halfway);
-				if (cosDelta > 0) outRadiance = outRadiance + light->Le * hit.material->ks * powf(cosDelta, hit.material->shininess);
+				if (cosDelta > 0) outRadiance = outRadiance + light->radianceAt(hit.position) * hit.material->ks * powf(cosDelta, hit.material->shininess);
 			}
 		}
 		return outRadiance;
 	}
+	/*
+	// Find the first intersection of the ray with objects
+	Hit firstIntersect(Ray ray) {
+		Hit bestHit;
+		for (auto object : objects) {
+			Hit hit = object->intersect(ray); //  hit.t < 0 if no intersection
+			if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t)) bestHit = hit;
+		}
+		return bestHit;
+	}
+
+	// Trace a ray and return the radiance of the visible surface
+	vec3 trace(Ray ray, int depth = 0) {
+		Hit hit = firstIntersect(ray);	// Find visible surface
+		vec3 outRad(0, 0, 0);
+		if (hit.t < 0 || depth >= maxdepth) return outRad;	// If there is no intersection
+
+		vec3 N = hit.normal;	// normal of the visible surface
+		vec3 outDir;
+		for (auto light : lights) {	// Direct light source computation
+			outDir = light->directionOf(hit.position);
+			Hit shadowHit = firstIntersect(Ray(hit.position + N * epsilon, outDir));
+			if (shadowHit.t < epsilon || shadowHit.t > light->distanceOf(hit.position)) {	// if not in shadow
+				double cosThetaL = dot(N, outDir);
+				if (cosThetaL >= epsilon) {
+					outRad = outRad + hit.material->kd / M_PI * cosThetaL * light->radianceAt(hit.position);
+				}
+			}
+		}
+
+		double diffuseSelectProb = (hit.material->kd.x + hit.material->kd.y + hit.material->kd.z)/3;
+		double mirrorSelectProb = (hit.material->ks.x + hit.material->ks.y + hit.material->ks.z)/3;
+
+		//double rnd = random();	// Russian roulette to find diffuse, mirror or no reflection
+		if (rnd() < diffuseSelectProb) { // diffuse
+			double pdf = SampleDiffuse(N, ray.dir, outDir);
+			double cosThetaL = dot(N, outDir);
+			if (cosThetaL >= epsilon) {
+				outRad = outRad + trace(Ray(hit.position + N * epsilon, outDir), depth + 1) * hit.material->kd / M_PI * cosThetaL / pdf / diffuseSelectProb;
+			}
+		}
+		else if (rnd() < diffuseSelectProb + mirrorSelectProb) { // mirror
+			double pdf = SampleMirror(N, ray.dir, outDir);
+			outRad = outRad + trace(Ray(hit.position + N * epsilon, outDir), depth + 1) * hit.material->ks / pdf / mirrorSelectProb;
+		}
+		return outRad;
+	}*/
 
 	void Animate(float dt) {
 		camera.Animate(dt);
@@ -416,7 +527,7 @@ const char* fragmentSource = R"(
 	out vec4 fragmentColor;		// output that goes to the raster memory as told by glBindFragDataLocation
 
 	void main() {
-		fragmentColor = texture(textureUnit, texcoord); 
+		fragmentColor = texture(textureUnit, texcoord);
 	}
 )";
 
