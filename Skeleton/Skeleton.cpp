@@ -80,7 +80,7 @@ struct Sphere : public Intersectable {
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
 		float sqrt_discr = sqrtf(discr);
-		float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
+		float t1 = (-b + sqrt_discr) / 2.0f / a;
 		float t2 = (-b - sqrt_discr) / 2.0f / a;
 		if (t1 <= 0) return hit;
 		hit.t = (t2 > 0) ? t2 : t1;
@@ -209,11 +209,10 @@ struct Paraboloid : public Intersectable {
 		float b = 2 * (dot(ray.start, ray.dir) - dot(ray.dir, focusPoint)) - 2 * (dot(normal, ray.start - planePoint)*dot(normal,ray.dir));
 		float c = dot(ray.start, ray.start) + dot(focusPoint, focusPoint) - 2 * dot(ray.start, focusPoint) -(dot(normal, ray.start-planePoint)* dot(normal, ray.start - planePoint));
 
-
 		float discr = b * b - 4.0f * a * c;
 		if (discr < 0) return hit;
 		float sqrt_discr = sqrtf(discr);
-		float t1 = (-b + sqrt_discr) / 2.0f / a;	// t1 >= t2 for sure
+		float t1 = (-b + sqrt_discr) / 2.0f / a;
 		float t2 = (-b - sqrt_discr) / 2.0f / a;
 		if (t1 <= 0) return hit;
 
@@ -253,8 +252,6 @@ struct Paraboloid : public Intersectable {
 		float gz = fabs(dot(normal, newPos - planePoint)) - length(newPos - focusPoint);
 
 		hit.normal = normalize(vec3(gx, gy, gz));
-
-
 		hit.material = material;
 		return hit;
 	}
@@ -366,14 +363,14 @@ public:
 	Hit firstIntersect(Ray ray) {
 		Hit bestHit;
 		for (Intersectable* object : objects) {
-			Hit hit = object->intersect(ray); //  hit.t < 0 if no intersection
+			Hit hit = object->intersect(ray);
 			if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t))  bestHit = hit;
 		}
 		if (dot(ray.dir, bestHit.normal) > 0) bestHit.normal = bestHit.normal * (-1);
 		return bestHit;
 	}
 
-	bool shadowIntersect(Ray ray, vec3 lightPos) {	// for directional lights
+	bool shadowIntersect(Ray ray, vec3 lightPos) {
 		for (Intersectable* object : objects) {
 			Hit hit = object->intersect(ray);
 			if (hit.t > 0 && length(hit.position-ray.start) < length(ray.start-lightPos)) {
@@ -391,7 +388,7 @@ public:
 			vec3 lhdir = normalize(light->location - hit.position);
 			Ray shadowRay(hit.position + hit.normal * epsilon, lhdir);
 			float cosTheta = dot(hit.normal, lhdir);
-			if (cosTheta > 0 && !shadowIntersect(shadowRay, light->location)) {	// shadow computation
+			if (cosTheta > 0 && !shadowIntersect(shadowRay, light->location)) {
 				outRadiance = outRadiance + light->radianceAt(hit.position) * hit.material->kd * cosTheta;
 				vec3 halfway = normalize(-ray.dir + lhdir);
 				float cosDelta = dot(hit.normal, halfway);
@@ -445,7 +442,7 @@ public:
 	}
 };
 
-GPUProgram gpuProgram; // vertex and fragment shaders
+GPUProgram gpuProgram;
 Scene scene;
 
 // vertex shader in GLSL
@@ -477,21 +474,20 @@ const char* fragmentSource = R"(
 )";
 
 class FullScreenTexturedQuad {
-	unsigned int vao = 0, textureId = 0;	// vertex array object id and texture id
+	unsigned int vao = 0, textureId = 0;
 public:
 	FullScreenTexturedQuad(int windowWidth, int windowHeight) {
-		glGenVertexArrays(1, &vao);	// create 1 vertex array object
-		glBindVertexArray(vao);		// make it active
+		glGenVertexArrays(1, &vao);
+		glBindVertexArray(vao);
 
-		unsigned int vbo;		// vertex buffer objects
-		glGenBuffers(1, &vbo);	// Generate 1 vertex buffer objects
+		unsigned int vbo;
+		glGenBuffers(1, &vbo);
 
-		// vertex coordinates: vbo0 -> Attrib Array 0 -> vertexPosition of the vertex shader
-		glBindBuffer(GL_ARRAY_BUFFER, vbo); // make it active, it is an array
-		float vertexCoords[] = { -1, -1,  1, -1,  1, 1,  -1, 1 };	// two triangles forming a quad
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexCoords), vertexCoords, GL_STATIC_DRAW);	   // copy to that part of the memory which is not modified 
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		float vertexCoords[] = { -1, -1,  1, -1,  1, 1,  -1, 1 };
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexCoords), vertexCoords, GL_STATIC_DRAW);
 		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);     // stride and offset: it is tightly packed
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
 
 		glGenTextures(1, &textureId);
 		glBindTexture(GL_TEXTURE_2D, textureId);
@@ -505,7 +501,7 @@ public:
 	}
 
 	void Draw() {
-		glBindVertexArray(vao);	// make the vao and its vbos active playing the role of the data source
+		glBindVertexArray(vao);
 		int location = glGetUniformLocation(gpuProgram.getId(), "textureUnit");
 		const unsigned int textureUnit = 0;
 		if (location > 0) {
@@ -513,7 +509,7 @@ public:
 			glActiveTexture(GL_TEXTURE0 + textureUnit);
 			glBindTexture(GL_TEXTURE_2D, textureId);
 		}
-		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);	// draw two triangles forming a quad
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 	}
 };
 
@@ -523,9 +519,7 @@ FullScreenTexturedQuad* fullScreenTexturedQuad;
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 	scene.build();
-	// copy image to GPU as a texture
 	fullScreenTexturedQuad = new FullScreenTexturedQuad(windowWidth, windowHeight);
-	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "fragmentColor");
 }
 
