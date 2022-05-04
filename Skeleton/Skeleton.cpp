@@ -59,33 +59,7 @@ protected:
 	Material* material;
 public:
 	virtual Hit intersect(const Ray& ray) = 0;
-	virtual void Animate(float dt) = 0;
 };
-
-vec4 quat(vec3 axis, float angle) {
-	vec3 res = normalize(axis) * sinf(angle / 2);
-	return vec4(res.x, res.y, res.z, cosf(angle/2));
-}
-
-vec4 quatMul(vec4 q1, vec4 q2) {
-	vec3 q1xyz = vec3(q1.x, q1.y, q1.z);
-	vec3 q2xyz = vec3(q2.x, q2.y, q2.z);
-	vec3 res = q1.w * q2xyz + q2.w * q1xyz + cross(q1xyz, q2xyz);
-	return vec4(
-		res.x, res.y, res.z,
-		q1.w * q2.w - dot(q1xyz, q2xyz)
-	);
-}
-
-vec4 quatInv(vec4 q) {
-	return vec4(-q.x, -q.y, -q.z, q.w);
-}
-
-vec3 quatRot(vec4 q, vec3 p) {
-	vec4 qInv = quatInv(q);
-	vec4 res = quatMul(quatMul(q, vec4(p.x, p.y, p.z, 0)), qInv);
-	return vec3(res.x, res.y, res.z);
-}
 
 struct Sphere : public Intersectable {
 	vec3 center;
@@ -115,10 +89,6 @@ struct Sphere : public Intersectable {
 		hit.material = material;
 		return hit;
 	}
-
-	void Animate(float dt) {
-		center.y += dt/50;
-	}
 };
 
 struct Plane : public Intersectable {
@@ -137,10 +107,6 @@ struct Plane : public Intersectable {
 		hit.normal = normal;
 		hit.material = material;
 		return hit;
-	}
-
-	void Animate(float dt) {
-
 	}
 };
 
@@ -167,10 +133,6 @@ struct Circle : public Intersectable {
 		hit.material = material;
 		return hit;
 	}
-
-	void Animate(float dt) {
-
-	}
 };
 
 struct Cylinder : public Intersectable {
@@ -188,10 +150,6 @@ struct Cylinder : public Intersectable {
 
 	Hit intersect(const Ray& ray) {
 		Hit hit;
-
-		vec4 q = quat(vec3(0, 1, 0), M_PI / 4);
-		//vec3 rd = quatRot(q, ray.dir);
-		//vec3 rs = quatRot(q, ray.start);
 
 		vec3 v0 = normalize(top-bottom);
 		vec3 dv0dv0 = ray.dir - v0 * dot(ray.dir, v0);
@@ -230,16 +188,12 @@ struct Cylinder : public Intersectable {
 		hit.material = material;
 		return hit;
 	}
-
-	void Animate(float dt) {
-		bottom.y += dt;
-		top.y += dt;
-		heigth = length(top - bottom);
-	}
 };
 
+vec3 focusPoint = 0;
+
 struct Paraboloid : public Intersectable {
-	vec3 normal, planePoint, focusPoint;
+	vec3 normal, planePoint;
 
 	Paraboloid(const vec3& _normal, const vec3& _planePoint, Material* _material) {
 		normal = normalize(_normal);
@@ -249,11 +203,6 @@ struct Paraboloid : public Intersectable {
 	}
 
 	Hit intersect(const Ray& ray) {
-
-		vec4 q = quat(vec3(1,0,0), M_PI/2);
-		//ray.dir = quatRot(q, ray.dir);
-		//ray.start = quatRot(q, ray.start);
-
 		Hit hit;
 
 		float a = dot(ray.dir, ray.dir) - (dot(normal, ray.dir) * dot(normal, ray.dir));
@@ -363,36 +312,41 @@ struct PointLight {
 
 float rnd() { return (float)rand() / RAND_MAX; }
 
+vec3 middlePos = vec3(-0.5, -0.1, 0);
+vec3 upperPos = vec3(0.15, 0.2, 0.2);
+
 class Scene {
 	std::vector<Intersectable*> objects;
 	std::vector<PointLight*> lights;
 	Camera camera;
 	vec3 La;
+	float time = 0;
 public:
 	void build() {
 		vec3 eye = vec3(0, 0, 2), vup = vec3(0, 1, 0), lookat = vec3(0, 0, 0);
 		float fov = 45 * M_PI / 180;
 		camera.set(eye, lookat, vup, fov);
 
-		La = vec3(0.1f, 0.1f, 0.1f);
-		vec3 Le(2, 2, 2);
-		lights.push_back(new PointLight(vec3(1, 1, 0.2), Le));
-		lights.push_back(new PointLight(vec3(0, 0.2, 0) + vec3(0, -0.01, 0.05), Le));
-
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material* material = new Material(kd, ks, 50);
 		Material* m2 = new Material(vec3(0.1f, 0.2f, 0.3f), vec3(2, 2, 2), 50);
 		objects.push_back(new Plane(vec3(0, 1, 0), vec3(0, -0.5, 0), m2));
 		objects.push_back(new Cylinder(vec3(0,-0.5,0), vec3(0, -0.45, 0), 0.2, material));
-
 		objects.push_back(new Circle(vec3(0,1,0), vec3(0, -0.45, 0), 0.2, material));
 		objects.push_back(new Sphere(vec3(0, -0.45, 0), 0.04f, material));
-		objects.push_back(new Cylinder(vec3(0, -0.45, 0), vec3(0, -0.1, -0.1), 0.02, material));
-		objects.push_back(new Sphere(vec3(0, -0.1, -0.1), 0.04f, material));
-		objects.push_back(new Cylinder(vec3(0, -0.1, -0.1), vec3(0, 0.2, 0), 0.02, material));
-		objects.push_back(new Sphere(vec3(0, 0.2, 0), 0.04f, material));
 
-		objects.push_back(new Paraboloid(vec3(0,-0.1,0.3), vec3(0,0.2,0), material));
+		objects.push_back(new Cylinder(vec3(0, -0.45, 0), middlePos, 0.02, material));
+
+		objects.push_back(new Sphere(middlePos, 0.04f, material));
+		objects.push_back(new Cylinder(middlePos, upperPos, 0.02, material));
+		objects.push_back(new Sphere(upperPos, 0.04f, material));
+
+		objects.push_back(new Paraboloid(vec3(0.3,-0.1,0), upperPos, material));
+
+		La = vec3(0.1f, 0.1f, 0.1f);
+		vec3 Le(2, 2, 2);
+		lights.push_back(new PointLight(vec3(0.5, 1, 1), Le));
+		lights.push_back(new PointLight(focusPoint, Le));
 	}
 
 	void render(std::vector<vec4>& image) {
@@ -406,7 +360,7 @@ public:
 			}
 		}
 		int rt = glutGet(GLUT_ELAPSED_TIME) - timeStart;
-		printf("Rendering time: %d ms\t FPS: %f\n", rt, 1000.0/rt);
+		//printf("Rendering time: %d ms\t FPS: %f\n", rt, 1000.0/rt);
 	}
 
 	Hit firstIntersect(Ray ray) {
@@ -444,72 +398,50 @@ public:
 				if (cosDelta > 0) outRadiance = outRadiance + light->radianceAt(hit.position) * hit.material->ks * powf(cosDelta, hit.material->shininess);
 			}
 		}
-		/*for (PointLight* light : lights) {	// Direct light source computation
-			vec3 outDir = light->directionOf(hit.position);
-			Hit shadowHit = firstIntersect(Ray(hit.position + hit.normal * epsilon, outDir));
-			if (shadowHit.t < epsilon || shadowHit.t > light->distanceOf(hit.position)) {	// if not in shadow
-				double cosThetaL = dot(hit.normal, outDir);
-				if (cosThetaL >= epsilon) {
-					outRadiance = outRadiance + hit.material->kd / M_PI * cosThetaL * light->radianceAt(hit.position);
-				}
-			}
-		}*/
 
 		return outRadiance;
 	}
-	/*
-	// Find the first intersection of the ray with objects
-	Hit firstIntersect(Ray ray) {
-		Hit bestHit;
-		for (auto object : objects) {
-			Hit hit = object->intersect(ray); //  hit.t < 0 if no intersection
-			if (hit.t > 0 && (bestHit.t < 0 || hit.t < bestHit.t)) bestHit = hit;
-		}
-		return bestHit;
-	}*/
-
-	// Trace a ray and return the radiance of the visible surface
-	/*vec3 trace(Ray ray, int depth = 0) {
-		Hit hit = firstIntersect(ray);	// Find visible surface
-		vec3 outRad(0, 0, 0);
-		if (hit.t < 0 || depth >= maxdepth) return outRad;	// If there is no intersection
-
-		vec3 N = hit.normal;	// normal of the visible surface
-		vec3 outDir;
-		for (auto light : lights) {	// Direct light source computation
-			outDir = light->directionOf(hit.position);
-			Hit shadowHit = firstIntersect(Ray(hit.position + N * epsilon, outDir));
-			if (shadowHit.t < epsilon || shadowHit.t > light->distanceOf(hit.position)) {	// if not in shadow
-				double cosThetaL = dot(N, outDir);
-				if (cosThetaL >= epsilon) {
-					outRad = outRad + hit.material->kd / M_PI * cosThetaL * light->radianceAt(hit.position);
-				}
-			}
-		}
-
-		double diffuseSelectProb = (hit.material->kd.x + hit.material->kd.y + hit.material->kd.z)/3;
-		double mirrorSelectProb = (hit.material->ks.x + hit.material->ks.y + hit.material->ks.z)/3;
-
-		//double rnd = random();	// Russian roulette to find diffuse, mirror or no reflection
-		if (rnd() < diffuseSelectProb) { // diffuse
-			double pdf = SampleDiffuse(N, ray.dir, outDir);
-			double cosThetaL = dot(N, outDir);
-			if (cosThetaL >= epsilon) {
-				outRad = outRad + trace(Ray(hit.position + N * epsilon, outDir), depth + 1) * hit.material->kd / M_PI * cosThetaL / pdf / diffuseSelectProb;
-			}
-		}
-		else if (rnd() < diffuseSelectProb + mirrorSelectProb) { // mirror
-			double pdf = SampleMirror(N, ray.dir, outDir);
-			outRad = outRad + trace(Ray(hit.position + N * epsilon, outDir), depth + 1) * hit.material->ks / pdf / mirrorSelectProb;
-		}
-		return outRad;
-	}*/
 
 	void Animate(float dt) {
 		camera.Animate(dt);
-		for (Intersectable* object : objects) {
-			//object->Animate(dt);
-		}
+		
+		time += dt;
+
+		float oldx = middlePos.x;
+		float oldy = middlePos.y;
+		float oldz = middlePos.z;
+		float movex = sinf(time) / 400;
+		float movez = cosf(time) / 400;
+		float newx = oldx + movex;
+		float newz = oldz + movez;
+		float movey = sqrtf(oldx * oldx + oldy * oldy + oldz * oldz - newx * newx - newz * newz) - oldy;
+		vec3 midMove = vec3(movex, movey, movez);
+		middlePos = middlePos + midMove;
+
+		float t2 = time - (dt / 2);
+		upperPos = upperPos + midMove;
+		upperPos.x -= sin(t2)/200*2;
+		upperPos.z += cos(t2)/200*2;
+		upperPos.y -= cos(t2)/400*2;
+
+		objects.clear();
+		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
+		Material* material = new Material(kd, ks, 50);
+		Material* m2 = new Material(vec3(0.1f, 0.2f, 0.3f), vec3(2, 2, 2), 50);
+		objects.push_back(new Plane(vec3(0, 1, 0), vec3(0, -0.5, 0), m2));
+		objects.push_back(new Cylinder(vec3(0, -0.5, 0), vec3(0, -0.45, 0), 0.2, material));
+		objects.push_back(new Circle(vec3(0, 1, 0), vec3(0, -0.45, 0), 0.2, material));
+		objects.push_back(new Sphere(vec3(0, -0.45, 0), 0.04f, material));
+
+		objects.push_back(new Cylinder(vec3(0, -0.45, 0), middlePos, 0.02, material));
+		objects.push_back(new Sphere(middlePos, 0.04f, material));
+		objects.push_back(new Cylinder(middlePos, upperPos, 0.02, material));
+		objects.push_back(new Sphere(upperPos, 0.04f, material));
+
+		objects.push_back(new Paraboloid(vec3(0.3 + sin(time)/8, -0.1, 0.2 + cos(time)/5), upperPos, material));
+
+		vec3 Le(2, 2, 2);
+		lights[1] = new PointLight(focusPoint, Le);
 	}
 };
 
@@ -603,7 +535,7 @@ void onDisplay() {
 	scene.render(image);
 	fullScreenTexturedQuad->LoadTexture(image);
 	fullScreenTexturedQuad->Draw();
-	glutSwapBuffers();									// exchange the two buffers
+	glutSwapBuffers();
 }
 
 // Key of ASCII code pressed
