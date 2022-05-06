@@ -221,27 +221,16 @@ struct Paraboloid : public Intersectable {
 
 		float l = length(planePoint - focusPoint)*4;
 
-		if (t2 <= 0) {
-			if (length(pos1 - focusPoint) <= l) {
-				hit.t = t1;
-				hit.position = pos1;
-			}
-			else {
-				return hit;
-			}
+		if (length(pos2 - focusPoint) <= l && t2 > 0) {
+			hit.t = t2;
+			hit.position = pos2;
+		}
+		else if (length(pos1 - focusPoint) <= l) {
+			hit.t = t1;
+			hit.position = pos1;
 		}
 		else {
-			if (length(pos2 - focusPoint) <= l) {
-				hit.t = t2;
-				hit.position = pos2;
-			}
-			else if (length(pos1 - focusPoint) <= l) {
-				hit.t = t1;
-				hit.position = pos1;
-			}
-			else {
-				return hit;
-			}
+			return hit;
 		}
 
 		vec3 newPos = hit.position + vec3(epsilon, 0, 0);
